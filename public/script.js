@@ -1454,7 +1454,7 @@ class Clara {
             // Use shorter URL format for better mobile compatibility
             const appointmentId = qrData.appointmentId;
             const dataB64 = btoa(unescape(encodeURIComponent(JSON.stringify(qrData))));
-            const appointmentDetailsUrl = `https://clarastokes.vercel.app/?id=${appointmentId}&api=${encodeURIComponent(baseUrl)}&data=${encodeURIComponent(dataB64)}`;
+            const appointmentDetailsUrl = `https://clarastokes.vercel.app/appointment-frontend/?id=${appointmentId}&api=${encodeURIComponent(baseUrl)}&data=${encodeURIComponent(dataB64)}`;
             const qrCodeString = appointmentDetailsUrl;
             console.log('📱 QR code URL:', qrCodeString);
              
@@ -1544,7 +1544,7 @@ class Clara {
             // Use shorter URL format for better mobile compatibility
             const appointmentId = qrData.appointmentId;
             const dataB64 = btoa(unescape(encodeURIComponent(JSON.stringify(qrData))));
-            const appointmentDetailsUrl = `https://clarastokes.vercel.app/?id=${appointmentId}&api=${encodeURIComponent(baseUrl)}&data=${encodeURIComponent(dataB64)}`;
+            const appointmentDetailsUrl = `https://clarastokes.vercel.app/appointment-frontend/?id=${appointmentId}&api=${encodeURIComponent(baseUrl)}&data=${encodeURIComponent(dataB64)}`;
             const qrCodeString = appointmentDetailsUrl;
             console.log('📱 QR code URL:', qrCodeString);
             

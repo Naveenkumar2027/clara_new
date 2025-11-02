@@ -218,38 +218,78 @@ app.post('/api/appointment', (req, res) => {
 });
 
 // Route to get appointment data by ID (for QR code redirects)
-app.get('/api/appointment/:id', (req, res) => {
-    try {
-        const appointmentId = req.params.id;
-        const appointmentData = appointmentStorage.get(appointmentId);
-        
-        if (!appointmentData) {
-            return res.status(404).json({ 
-                error: 'Appointment not found',
-                message: 'This appointment ID does not exist or has expired'
-            });
-        }
-        
-        // Check if appointment has expired
-        if (appointmentData.expiresAt && Date.now() > appointmentData.expiresAt) {
-            appointmentStorage.delete(appointmentId);
-            return res.status(404).json({ 
-                error: 'Appointment expired',
-                message: 'This appointment has expired'
-            });
-        }
-        
-        // Remove expiration data before sending
-        const { expiresAt, ...cleanData } = appointmentData;
-        res.json(cleanData);
-    } catch (error) {
-        console.error('Error fetching appointment data:', error);
-        res.status(500).json({ 
-            error: 'Internal server error',
-            message: 'Failed to fetch appointment data'
-        });
+app.get('/api/appointment/:id', async (req, res) => {
+  try {
+    const appointmentId = req.params.id;
+    const memory = appointmentStorage.get(appointmentId);
+
+    // If present in memory and not expired, return it immediately
+    if (memory) {
+      if (memory.expiresAt && Date.now() > memory.expiresAt) {
+        appointmentStorage.delete(appointmentId);
+      } else {
+        const { expiresAt, ...clean } = memory;
+        return res.json(clean);
+      }
     }
+
+    // Fallback: fetch from MongoDB by appointmentId or _id
+    const appt = await Appointment.findOne({ appointmentId })
+      .populate('staffId', 'name email department')
+      .populate('clientId', 'name email phone');
+
+    if (!appt) {
+      // Try by Mongo _id format as a secondary attempt
+      let byObjectId = null;
+      try {
+        if (appointmentId.match(/^[a-f\d]{24}$/i)) {
+          byObjectId = await Appointment.findById(appointmentId)
+            .populate('staffId', 'name email department')
+            .populate('clientId', 'name email phone');
+        }
+      } catch (_) { /* ignore parse errors */ }
+
+      if (!byObjectId) {
+        return res.status(404).json({ 
+          error: 'Appointment not found',
+          message: 'This appointment ID does not exist or has expired'
+        });
+      }
+      // use byObjectId
+      return res.json(normalizeAppointment(byObjectId));
+    }
+
+    return res.json(normalizeAppointment(appt));
+  } catch (error) {
+    console.error('Error fetching appointment data:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: 'Failed to fetch appointment data'
+    });
+  }
 });
+
+// Helper to normalize Appointment mongoose doc for frontend
+function normalizeAppointment(appt) {
+  const dateStr = appt.appointmentDate
+    ? new Date(appt.appointmentDate).toLocaleDateString()
+    : '';
+  const timeStr = appt.appointmentTime && appt.appointmentTime.start
+    ? appt.appointmentTime.start
+    : '';
+  return {
+    appointmentId: appt.appointmentId || String(appt._id),
+    clientName: appt.clientName || (appt.clientId && appt.clientId.name) || '',
+    staffName: appt.staffId && appt.staffId.name ? appt.staffId.name : '',
+    department: appt.staffId && appt.staffId.department ? appt.staffId.department : '',
+    purpose: appt.purpose || '',
+    date: dateStr,
+    time: timeStr,
+    status: appt.status || 'Confirmed',
+    location: appt.location || '',
+    staffEmail: appt.staffId && appt.staffId.email ? appt.staffId.email : ''
+  };
+}
 
 // Route to get tunnel configuration
 app.get('/api/tunnel-config', (req, res) => {
@@ -2741,27 +2781,29 @@ app.get('/api/health', async (req, res) => {
   res.json(healthData);
 });
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`🚀 Clara AI Reception System running on port ${PORT}`);
-  console.log(`📱 Client Interface: http://localhost:${PORT}`);
-  console.log(`👥 Staff Interface: http://localhost:${PORT}/staff-interface`);
-  console.log(`🎥 Video Call: Integrated into main interfaces`);
-  console.log(`🎓 College Demo: http://localhost:${PORT}/college-demo`);
-  console.log(`🔗 n8n Test Page: http://localhost:${PORT}/n8n-test`);
-  console.log(`🧪 Route Test Page: http://localhost:${PORT}/test-routes`);
-  console.log(`🔧 API health check: http://localhost:${PORT}/api/health`);
-  console.log(`🏫 College AI API: http://localhost:${PORT}/api/college/ask`);
-  console.log(`🔗 n8n Integration API: http://localhost:${PORT}/api/n8n`);
-  console.log(`🧪 n8n Test endpoint: http://localhost:${PORT}/api/n8n/test`);
-  
-  const GEMINI_KEY = process.env.GEMINI_API_KEY;
-  
-  if (GEMINI_KEY && GEMINI_KEY !== 'your_gemini_api_key_here') {
-    console.log(`🤖 Full AI mode enabled with Gemini AI`);
-  } else {
-    console.log(`⚠️  Note: Running in demo mode. Set GEMINI_API_KEY in .env for full AI functionality.`);
-  }
-});
+// Start server only when run directly (not when imported by Vercel serverless function)
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`🚀 Clara AI Reception System running on port ${PORT}`);
+    console.log(`📱 Client Interface: http://localhost:${PORT}`);
+    console.log(`👥 Staff Interface: http://localhost:${PORT}/staff-interface`);
+    console.log(`🎥 Video Call: Integrated into main interfaces`);
+    console.log(`🎓 College Demo: http://localhost:${PORT}/college-demo`);
+    console.log(`🔗 n8n Test Page: http://localhost:${PORT}/n8n-test`);
+    console.log(`🧪 Route Test Page: http://localhost:${PORT}/test-routes`);
+    console.log(`🔧 API health check: http://localhost:${PORT}/api/health`);
+    console.log(`🏫 College AI API: http://localhost:${PORT}/api/college/ask`);
+    console.log(`🔗 n8n Integration API: http://localhost:${PORT}/api/n8n`);
+    console.log(`🧪 n8n Test endpoint: http://localhost:${PORT}/api/n8n/test`);
+    
+    const GEMINI_KEY = process.env.GEMINI_API_KEY;
+    
+    if (GEMINI_KEY && GEMINI_KEY !== 'your_gemini_api_key_here') {
+      console.log(`🤖 Full AI mode enabled with Gemini AI`);
+    } else {
+      console.log(`⚠️  Note: Running in demo mode. Set GEMINI_API_KEY in .env for full AI functionality.`);
+    }
+  });
+}
 
 module.exports = app;
