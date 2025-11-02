@@ -1,3 +1,8 @@
+  // Helper to set text content for fields
+  function set(id, value) {
+    var el = document.getElementById(id);
+    if (el) el.textContent = value;
+  }
 (function(){
   const qs = new URLSearchParams(location.search);
   const id = qs.get('id');
@@ -7,6 +12,7 @@
   const errorBox = document.getElementById('error');
   const errmsg = document.getElementById('errmsg');
 
+  // Updated for Vercel deployment: apiBase can be https://clarastokes.vercel.app or your backend URL
   const apiBase = qs.get('api') || '';
   const preloaded = (() => {
     try {
@@ -35,7 +41,7 @@
     set('f-purpose', d.purpose||'Video Consultation');
     set('f-date', d.date||new Date().toLocaleDateString());
     set('f-time', d.time||new Date().toLocaleTimeString());
-    set('f-status', d.status||'confirmed');
+    set('f-status', d.status ? d.status.charAt(0).toUpperCase() + d.status.slice(1) : 'Confirmed');
     set('f-location', d.location||'College Campus');
     set('f-contact', (d.contact||d.staffEmail||'staff@example.com'));
   }
@@ -76,6 +82,19 @@
       console.error(err);
     }
   }
+
+  // Add refresh button logic
+  document.addEventListener('DOMContentLoaded', function(){
+    const refreshBtn = document.getElementById('refresh');
+    if(refreshBtn){
+      refreshBtn.addEventListener('click', function(){
+        loading.style.display='block';
+        info.style.display='none';
+        errorBox.style.display='none';
+        init();
+      });
+    }
+  });
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
